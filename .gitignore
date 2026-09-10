@@ -1,0 +1,50 @@
+# IDEs
+.idea/
+.vscode/
+
+# Ambientes virtuais
+.venv/
+venv/
+env/
+
+# Variáveis de ambiente
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
+*.whl
+
+# Testes e cobertura
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# AWS SAM
+.aws-sam/
+samconfig.toml
+
+# Arquivos locais de configuracao
+env.local.json
+
+# Chaves e certificados locais
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks

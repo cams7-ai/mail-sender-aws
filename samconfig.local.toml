@@ -1,0 +1,15 @@
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "mail-sender"
+resolve_s3 = true
+s3_prefix = "mail-sender"
+region = "us-east-2"
+profile = "<perfil-aws-local>"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+image_repositories = []
+parameter_overrides = "SesFrom=<remetente-verificado@example.com>"
+
+[default.global.parameters]
+region = "us-east-2"
