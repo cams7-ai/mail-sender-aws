@@ -198,7 +198,7 @@ Crie uma identidade para o remetente:
 ```powershell
 aws sesv2 create-email-identity `
   --email-identity "remetente@example.com" `
-  --region us-east-2 `
+  --region us-east-1 `
   --profile seu-perfil
 ```
 
@@ -207,7 +207,7 @@ Depois, confirme o link enviado pela AWS e consulte o status:
 ```powershell
 aws sesv2 get-email-identity `
   --email-identity "remetente@example.com" `
-  --region us-east-2 `
+  --region us-east-1 `
   --profile seu-perfil
 ```
 
@@ -238,7 +238,7 @@ sam deploy
 No primeiro deploy, também é possível usar o assistente:
 
 ```powershell
-sam deploy --guided --profile seu-perfil --region us-east-2
+sam deploy --guided --profile seu-perfil --region us-east-1
 ```
 
 Ao final, o output `ApiUrl` apresenta a URL base da API. Para chamar a rota publicada:
@@ -246,7 +246,7 @@ Ao final, o output `ApiUrl` apresenta a URL base da API. Para chamar a rota publ
 ```powershell
 Invoke-RestMethod `
   -Method Post `
-  -Uri "https://<api-id>.execute-api.us-east-2.amazonaws.com/api/v1/mail/send" `
+  -Uri "https://<api-id>.execute-api.us-east-1.amazonaws.com/api/v1/mail/send" `
   -ContentType "application/json" `
   -Body '{"to":"destinatario-verificado@example.com","subject":"Teste AWS","body":"Mensagem enviada via AWS"}'
 ```
@@ -303,7 +303,7 @@ Confirme se o remetente configurado em `SesFrom` existe e está verificado na me
 ```powershell
 aws sesv2 get-email-identity `
   --email-identity "<remetente-verificado@example.com>" `
-  --region us-east-2 `
+  --region us-east-1 `
   --profile <perfil-aws-local>
 ```
 
@@ -312,11 +312,11 @@ Enquanto o SES estiver no sandbox, faça a mesma verificação para o destinatá
 ```powershell
 aws sesv2 get-email-identity `
   --email-identity "<destinatario-verificado@example.com>" `
-  --region us-east-2 `
+  --region us-east-1 `
   --profile <perfil-aws-local>
 
 aws sesv2 get-account `
-  --region us-east-2 `
+  --region us-east-1 `
   --profile <perfil-aws-local>
 ```
 

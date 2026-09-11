@@ -4,7 +4,7 @@ Este roteiro assume que o Windows já possui:
 
 - AWS CLI instalado e autenticado em um perfil local.
 - AWS SAM CLI instalado.
-- Região padrão do projeto: `us-east-2`.
+- Região padrão do projeto: `us-east-1`.
 - Projeto local: `<diretorio-local>\mail-sender-aws`.
 
 ## 1. Arquitetura alvo
@@ -48,7 +48,7 @@ Crie uma identidade de e-mail para o remetente:
 ```powershell
 aws sesv2 create-email-identity `
   --email-identity "<remetente-verificado@example.com>" `
-  --region us-east-2 `
+  --region us-east-1 `
   --profile <perfil-aws-local>
 ```
 
@@ -59,7 +59,7 @@ Valide a identidade:
 ```powershell
 aws sesv2 get-email-identity `
   --email-identity "<remetente-verificado@example.com>" `
-  --region us-east-2 `
+  --region us-east-1 `
   --profile <perfil-aws-local>
 ```
 
@@ -360,7 +360,7 @@ Pegue a URL no output `ApiUrl`:
 ```powershell
 aws cloudformation describe-stacks `
   --stack-name mail-sender `
-  --region us-east-2 `
+  --region us-east-1 `
   --profile <perfil-aws-local> `
   --query "Stacks[0].Outputs"
 ```
@@ -370,7 +370,7 @@ Teste:
 ```powershell
 Invoke-RestMethod `
   -Method Post `
-  -Uri "https://<api-id>.execute-api.us-east-2.amazonaws.com/api/v1/mail/send" `
+  -Uri "https://<api-id>.execute-api.us-east-1.amazonaws.com/api/v1/mail/send" `
   -ContentType "application/json" `
   -Body '{"to":"<destinatario-verificado@example.com>","subject":"Teste AWS","body":"Mensagem enviada via AWS"}'
 ```
@@ -454,7 +454,7 @@ Antes de produção, prefira verificar um domínio em vez de apenas um e-mail in
 
 - `aws sts get-caller-identity` funcionando com o perfil AWS local.
 - `sam --version` funcionando.
-- Identidade SES verificada em `us-east-2`.
+- Identidade SES verificada em `us-east-1`.
 - `SesEmailSender` implementado.
 - `lambda_handler.py` implementado.
 - `template.yaml` criado.
@@ -473,7 +473,7 @@ Antes de produção, prefira verificar um domínio em vez de apenas um e-mail in
 Se precisar remover os recursos criados:
 
 ```powershell
-sam delete --stack-name mail-sender --region us-east-2 --profile <perfil-aws-local>
+sam delete --stack-name mail-sender --region us-east-1 --profile <perfil-aws-local>
 ```
 
 Remova a identidade do SES:
@@ -481,7 +481,7 @@ Remova a identidade do SES:
 ```powershell
 aws sesv2 delete-email-identity `
   --email-identity "<remetente-verificado@example.com>" `
-  --region us-east-2 `
+  --region us-east-1 `
   --profile <perfil-aws-local>
 ```
 
@@ -490,7 +490,7 @@ Valide a identidade:
 ```powershell
 aws sesv2 get-email-identity `
   --email-identity "<remetente-verificado@example.com>" `
-  --region us-east-2 `
+  --region us-east-1 `
   --profile <perfil-aws-local>
 ```
 
