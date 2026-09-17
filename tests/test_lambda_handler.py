@@ -86,6 +86,11 @@ def test_handle_event_returns_404_for_unknown_endpoint():
     }
 
 
+def test_handle_event_accepts_direct_lambda_invocation():
+    response = handle_event({"to": "to@example.com", "subject": "Assunto", "body": "Mensagem"}, FakeEmailSender())
+    assert response["statusCode"] == 200
+
+
 def _event(body, method="POST", path="/api/v1/mail/send"):
     return {
         "routeKey": f"{method} {path}",
@@ -93,6 +98,7 @@ def _event(body, method="POST", path="/api/v1/mail/send"):
         "requestContext": {"http": {"method": method}},
         "body": json.dumps(body),
         "isBase64Encoded": False,
+        "headers": {"x-api-key": "shared-token"},
     }
 
 

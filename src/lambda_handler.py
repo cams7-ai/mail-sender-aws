@@ -20,11 +20,12 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
 
 def handle_event(event: dict[str, Any], email_sender: EmailSender | None = None) -> dict[str, Any]:
-    if not _is_send_mail_route(event):
+    direct_invocation = "requestContext" not in event
+    if not direct_invocation and not _is_send_mail_route(event):
         return _error_response(404, "not_found", "Recurso não encontrado.")
 
     try:
-        payload = EmailRequest.model_validate(_read_json_body(event))
+        payload = EmailRequest.model_validate(event if direct_invocation else _read_json_body(event))
         use_case = SendEmailUseCase(email_sender or SesEmailSender())
         use_case.execute(
             EmailMessageData(

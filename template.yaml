@@ -1,6 +1,18 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: mail-sender serverless API
+Description: Mail Sender Lambda - invoked privately by LotoBot with least-privilege IAM
+
+Metadata:
+  AWSToolsMetrics:
+    AWSAgentToolkit: aws-cloudformation@2
+  com.aws.cloudformation.Context:
+    arch: LotoBot EC2 -> private Lambda Invoke -> Amazon SES
+    must:
+      - grant lambda:InvokeFunction only to approved consumer roles
+    ref:
+      - at: docs/AWS_SAM_MIGRATION_STEP_BY_STEP.md
+        has: deploy and LotoBot integration procedure
+        scope: local
 
 Parameters:
   SesFrom:
@@ -22,6 +34,11 @@ Globals:
 Resources:
   MailSenderFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: accepts IAM-authorized direct invocations and sends one email through SES
+        must:
+          - do not add a public HTTP event for the LotoBot integration
     Properties:
       CodeUri: src/
       Handler: lambda_handler.handler
@@ -31,12 +48,6 @@ Resources:
               Action:
                 - ses:SendEmail
               Resource: "*"
-      Events:
-        SendMail:
-          Type: HttpApi
-          Properties:
-            Path: /api/v1/mail/send
-            Method: POST
 
   MailSenderFunctionLogGroup:
     Type: AWS::Logs::LogGroup
@@ -45,6 +56,9 @@ Resources:
       RetentionInDays: 7
 
 Outputs:
-  ApiUrl:
-    Description: HTTP API endpoint
-    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  FunctionArn:
+    Description: Lambda ARN consumed by the LotoBot role.
+    Value: !GetAtt MailSenderFunction.Arn
+  FunctionName:
+    Description: Lambda name for direct invocation.
+    Value: !Ref MailSenderFunction
