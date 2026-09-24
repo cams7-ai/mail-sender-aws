@@ -4,9 +4,9 @@ version = 0.1
 stack_name = "mail-sender"
 resolve_s3 = true
 s3_prefix = "mail-sender"
-region = "sa-east-1"
+region = "us-east-1"
 profile = "<perfil-aws>"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
 image_repositories = []
-parameter_overrides = "SesFrom=\"<remetente-verificado@example.com>\""
+parameter_overrides = "VpcId=\"<loto-bot-vpc-id>\" SubnetId=\"<loto-bot-subnet-id>\" SesFrom=\"<remetente-verificado@example.com>\""

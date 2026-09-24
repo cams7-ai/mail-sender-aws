@@ -4,13 +4,14 @@ Este guia corresponde ao [`template.yaml`](../template.yaml) vigente. A função
 
 ## Arquitetura e segurança
 
-Fluxo: `loto-bot` EC2 → endpoint privado do serviço Lambda → `MailSenderFunction` → Amazon SES.
+Fluxo: `loto-bot` EC2 → endpoint privado do serviço Lambda → `MailSenderFunction` na mesma VPC/subnet dual-stack → Amazon SES por IPv6.
 
 - `MAIL_SENDER_URL` não é usado na AWS; o consumidor recebe o ARN em `MAIL_SENDER_FUNCTION_NAME`;
 - não há `X-API-Key`, `INTEGRATION_API_TOKEN` ou segredo compartilhado;
 - a role do `loto-bot` deve permitir invocação somente do ARN desta função;
 - a função permite somente `ses:SendEmail`;
 - não adicione evento HTTP público para esta integração.
+- a função usa a VPC e a subnet criadas pelo guia do `loto-bot`; `Ipv6AllowedForDualStack` e `AWS_USE_DUALSTACK_ENDPOINT=true` preservam a saída para o SES sem NAT IPv4.
 
 ## Pré-requisitos
 
@@ -18,13 +19,38 @@ Fluxo: `loto-bot` EC2 → endpoint privado do serviço Lambda → `MailSenderFun
 - Python 3.12;
 - identidade AWS com acesso a CloudFormation, Lambda, IAM, Logs, S3 e SES;
 - remetente verificado no SES;
+- `$VpcId` e `$SubnetId` obtidos nas etapas de criação da rede do [`loto-bot`](../../../loto-bot/docs/AWS_FREE_TIER_MIGRATION_WITH_PROXY_SOCKS5_STEP_BY_STEP.md);
+- subnet dual-stack com rota `::/0` e DNS da VPC habilitado;
 - mesma conta e região usadas pelo `loto-bot`, salvo se políticas cross-account forem configuradas explicitamente.
 
 ```powershell
+$AppName = "loto-bot"
 $AwsProfile = "<perfil>"
-$AwsRegion = "sa-east-1"
+$AwsRegion = "us-east-1"
 $StackName = "mail-sender"
 $SesFrom = "<remetente-verificado>"
+$VpcId = aws ec2 describe-vpcs `
+    --filters "Name=tag:Name,Values=$AppName" `
+              "Name=tag:Application,Values=$AppName" `
+    --query "Vpcs[0].VpcId" `
+    --region $AwsRegion `
+    --profile $AwsProfile `
+    --output text
+$AvailabilityZone = aws ec2 describe-availability-zones `
+  --filters "Name=state,Values=available" `
+  --query "AvailabilityZones[0].ZoneName" `
+  --region $AwsRegion `
+  --profile $AwsProfile `
+  --output text
+$SubnetId = aws ec2 describe-subnets `
+    --filters "Name=vpc-id,Values=$VpcId" `
+              "Name=availability-zone,Values=$AvailabilityZone" `
+              "Name=tag:Name,Values=$AppName" `
+              "Name=tag:Application,Values=$AppName" `
+    --query "Subnets[0].SubnetId" `
+    --region $AwsRegion `
+    --profile $AwsProfile `
+    --output text
 ```
 
 Se a conta SES estiver em sandbox, remetentes e destinatários precisam estar verificados. Solicite saída do sandbox antes de uso real.
@@ -47,7 +73,15 @@ sam deploy `
   --capabilities CAPABILITY_IAM `
   --region $AwsRegion `
   --profile $AwsProfile `
-  --parameter-overrides SesFrom=$SesFrom
+  --parameter-overrides VpcId=$VpcId SubnetId=$SubnetId SesFrom=$SesFrom
+```
+
+Confirme antes do deploy que a subnet realmente pertence à VPC compartilhada:
+
+```powershell
+aws ec2 describe-subnets --subnet-ids $SubnetId `
+  --query "Subnets[0].{VpcId:VpcId,Ipv4:CidrBlock,Ipv6:Ipv6CidrBlockAssociationSet[0].Ipv6CidrBlock}" `
+  --output table --region $AwsRegion --profile $AwsProfile
 ```
 
 Revise o change set antes de confirmar. O parâmetro `SesFrom` usa `NoEcho`, mas ainda deve ser tratado como configuração sensível.
@@ -100,6 +134,8 @@ Para atualizar, rode testes, `sam build` e `sam deploy`, sempre revisando o chan
 - [ ] Remetente verificado e situação do sandbox conferida.
 - [ ] Testes, `sam validate` e `sam build` aprovados.
 - [ ] Nenhum evento API Gateway ou Function URL configurado.
+- [ ] `VpcId` e `SubnetId` são os mesmos usados pelo `loto-bot`.
+- [ ] Subnet dual-stack possui rota IPv6 e a função está com `Ipv6AllowedForDualStack`.
 - [ ] Output `FunctionArn` entregue ao `loto-bot`.
 - [ ] Role do consumidor limitada a este ARN.
 - [ ] Nenhuma chave de API compartilhada configurada.
