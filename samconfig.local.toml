@@ -9,4 +9,4 @@ profile = "<perfil-aws>"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
 image_repositories = []
-parameter_overrides = "VpcId=\"<loto-bot-vpc-id>\" SubnetId=\"<loto-bot-subnet-id>\" SesFrom=\"<remetente-verificado@example.com>\""
+parameter_overrides = "SesFrom=\"<remetente-verificado@example.com>\""

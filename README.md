@@ -23,10 +23,10 @@
   </p>
 </div>
 
-> O Mail Sender AWS recebe uma mensagem por HTTP API, valida o payload em uma função Lambda e envia o e-mail pelo Amazon SES.
+> O Mail Sender AWS recebe invocações diretas da EC2 do LotoBot, valida o payload na Lambda e envia o e-mail pelo Amazon SES.
 
 > [!CAUTION]
-> A rota ainda não possui autenticação. Não exponha o endpoint em produção antes de adicionar API key, JWT authorizer ou outro controle de acesso.
+> O template não publica API Gateway ou Function URL. A role do LotoBot recebe `lambda:InvokeFunction` somente no ARN da função.
 
 ## Visão Geral
 
@@ -34,10 +34,10 @@ Este projeto é a versão serverless do `mail-sender`. Ele usa um Lambda handler
 
 ### Principais características
 
-- **Serverless**: API Gateway HTTP API e AWS Lambda, sem servidor permanente.
+- **Serverless**: AWS Lambda invocada diretamente por IAM, sem API Gateway.
 - **Envio gerenciado**: integração com Amazon SES API v2 por meio do `boto3`.
 - **Validação de entrada**: payload validado com Pydantic.
-- **Clean Architecture**: domínio, caso de uso, entrada HTTP e infraestrutura separados.
+- **Clean Architecture**: domínio, caso de uso, handler e infraestrutura separados.
 - **Infraestrutura como código**: recursos definidos em AWS SAM.
 - **Testes isolados**: fakes substituem o SES; os testes não enviam e-mails reais.
 - **Logs controlados**: retenção de sete dias no CloudWatch Logs.
@@ -46,8 +46,7 @@ Este projeto é a versão serverless do `mail-sender`. Ele usa um Lambda handler
 
 ```mermaid
 flowchart LR
-    C[Cliente HTTP] -->|POST /api/v1/mail/send| API[API Gateway HTTP API]
-    API --> LH[Lambda handler]
+    C[LotoBot EC2] -->|Lambda Invoke IAM| LH[Lambda handler]
     LH --> P[Pydantic]
     P --> UC[SendEmailUseCase]
     UC --> PORT[EmailSender]
@@ -55,7 +54,6 @@ flowchart LR
     SES --> AWSSES[Amazon SES]
     AWSSES --> D[Destinatário]
 
-    style API fill:#8C4FFF,stroke:#5A23C8,color:#fff
     style LH fill:#FF9900,stroke:#C77700,color:#fff
     style AWSSES fill:#DD344C,stroke:#A51F35,color:#fff
 ```
@@ -69,7 +67,7 @@ mail-sender-aws/
 │   ├── application/                 # Caso de uso de envio
 │   ├── domain/                      # Entidades, porta e exceções
 │   ├── infrastructure/              # Integração com Amazon SES
-│   ├── lambda_handler.py            # Entrada do API Gateway
+│   ├── lambda_handler.py            # Entrada da invocação direta
 │   └── requirements.txt             # Dependências empacotadas pelo SAM
 ├── tests/                            # Testes unitários
 ├── docs/                             # Roteiro da migração para AWS
@@ -87,7 +85,7 @@ mail-sender-aws/
 | AWS SAM CLI | Atual | Build, execução local e deploy |
 | Docker Desktop | Em execução | Obrigatório para `sam local` |
 | Amazon SES | Identidade verificada | Remetente usado pela Lambda |
-| Credenciais AWS | Perfil configurado | Permissão para CloudFormation, Lambda, API Gateway, IAM, Logs e SES |
+| Credenciais AWS | Perfil configurado | Permissão para CloudFormation, Lambda, IAM, Logs e SES |
 
 ## Quickstart
 
@@ -241,14 +239,12 @@ No primeiro deploy, também é possível usar o assistente:
 sam deploy --guided --profile seu-perfil --region us-east-1
 ```
 
-Ao final, o output `ApiUrl` apresenta a URL base da API. Para chamar a rota publicada:
+Ao final, recupere o output `FunctionArn` e passe-o ao LotoBot. Para um teste direto:
 
 ```powershell
-Invoke-RestMethod `
-  -Method Post `
-  -Uri "https://<api-id>.execute-api.us-east-1.amazonaws.com/api/v1/mail/send" `
-  -ContentType "application/json" `
-  -Body '{"to":"destinatario-verificado@example.com","subject":"Teste AWS","body":"Mensagem enviada via AWS"}'
+$FunctionArn = aws cloudformation describe-stacks --stack-name mail-sender --query "Stacks[0].Outputs[?OutputKey=='FunctionArn'].OutputValue | [0]" --output text
+aws lambda invoke --function-name $FunctionArn --cli-binary-format raw-in-base64-out --payload '{"to":"destinatario-verificado@example.com","subject":"Teste AWS","body":"Mensagem enviada via AWS"}' response.json
+Get-Content response.json
 ```
 
 ## Testes
@@ -264,8 +260,8 @@ Os testes usam implementações fake do sender e do cliente SES. Nenhuma chamada
 
 - Não versione `env.local.json`, `samconfig.toml`, credenciais ou tokens da AWS.
 - Não registre o corpo completo dos e-mails nem dados sensíveis.
-- Proteja a rota com API key, JWT authorizer ou Lambda authorizer antes de produção.
-- Mantenha a política IAM limitada a `ses:SendEmail` e restrinja o recurso à identidade SES quando o ARN definitivo estiver disponível.
+- Não adicione rota HTTP pública sem um consumidor externo e um modelo de autorização definido.
+- A política IAM limita `ses:SendEmail` pelo endereço `ses:FromAddress`. Valide a identidade SES antes de restringir também o ARN.
 - Prefira verificar um domínio e configurar DKIM antes do uso em produção.
 - Configure budgets e alarmes para erros e throttles.
 
@@ -282,7 +278,7 @@ docker info
 </details>
 
 <details>
-<summary>API Gateway retorna <code>{"message":"Internal Server Error"}</code></summary>
+<summary>Lambda Invoke retorna erro de função</summary>
 
 Reconstrua sem cache e confirme que as dependências de `src/requirements.txt` foram empacotadas:
 
@@ -292,7 +288,7 @@ Get-ChildItem .aws-sam\build\MailSenderFunction
 sam deploy
 ```
 
-Consulte também os logs da função no CloudWatch para identificar falhas de importação ou inicialização. Erros tratados de envio pelo SES não incluem atualmente a exceção original nesses logs.
+Consulte também os logs da função no CloudWatch para identificar falhas de importação ou inicialização. Falhas de envio registram apenas tipo e código do erro, sem corpo ou destinatário.
 </details>
 
 <details>
@@ -322,7 +318,7 @@ aws sesv2 get-account `
 
 Remetente e destinatário devem apresentar `VerificationStatus` igual a `SUCCESS`. Uma identidade criada em outra região não é reutilizada automaticamente. Depois de corrigir `SesFrom` no `samconfig.toml`, execute `sam build` e `sam deploy`.
 
-O handler retorna uma mensagem genérica para não expor detalhes internos. Na implementação atual, a exceção tratada do SES não é registrada no CloudWatch.
+O handler retorna uma mensagem genérica para não expor detalhes internos. O tipo e o código da falha aparecem no CloudWatch sem conteúdo do e-mail.
 </details>
 
 <details>

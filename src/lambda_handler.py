@@ -1,5 +1,6 @@
 import base64
 import json
+import logging
 from typing import Any
 
 from pydantic import ValidationError
@@ -13,6 +14,7 @@ from infrastructure import SesEmailSender
 
 
 SEND_MAIL_ROUTE = "POST /api/v1/mail/send"
+logger = logging.getLogger(__name__)
 
 
 def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
@@ -39,7 +41,11 @@ def handle_event(event: dict[str, Any], email_sender: EmailSender | None = None)
         return _error_response(503, "configuration_error", str(exc))
     except (json.JSONDecodeError, ValidationError, ValueError):
         return _error_response(422, "validation_error", "Dados de entrada inválidos.")
-    except Exception:
+    except Exception as exc:
+        response = getattr(exc, "response", None)
+        error = response.get("Error", {}) if isinstance(response, dict) else {}
+        code = error.get("Code", "unknown") if isinstance(error, dict) else "unknown"
+        logger.error("Email send failed: type=%s code=%s", type(exc).__name__, code)
         return _error_response(500, "email_send_error", "Falha ao enviar e-mail.")
 
     return _json_response(200, {"message": "E-mail enviado com sucesso."})

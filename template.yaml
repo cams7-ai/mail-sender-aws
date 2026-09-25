@@ -1,12 +1,12 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: Mail Sender Lambda - invoked privately by LotoBot with least-privilege IAM
+Description: Mail Sender Lambda - invoked by LotoBot through IAM and sends through Amazon SES
 
 Metadata:
   AWSToolsMetrics:
     AWSAgentToolkit: aws-cloudformation@2
   com.aws.cloudformation.Context:
-    arch: LotoBot EC2 -> private Lambda Invoke -> Amazon SES
+    arch: LotoBot EC2 -> IAM-authorized Lambda Invoke -> Amazon SES
     must:
       - grant lambda:InvokeFunction only to approved consumer roles
     ref:
@@ -15,12 +15,6 @@ Metadata:
         scope: local
 
 Parameters:
-  VpcId:
-    Type: AWS::EC2::VPC::Id
-    Description: VPC compartilhada criada pelo procedimento do loto-bot.
-  SubnetId:
-    Type: AWS::EC2::Subnet::Id
-    Description: Subnet dual-stack compartilhada criada pelo procedimento do loto-bot.
   SesFrom:
     Type: String
     NoEcho: true
@@ -35,39 +29,9 @@ Globals:
       - x86_64
     Environment:
       Variables:
-        AWS_USE_DUALSTACK_ENDPOINT: "true"
         SES_FROM: !Ref SesFrom
 
 Resources:
-  MailSenderSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Metadata:
-      com.aws.cloudformation.Context:
-        why: attaches Mail Sender to the LotoBot VPC while allowing DNS and IPv6 HTTPS egress to SES
-        must:
-          - VpcId and SubnetId must identify the shared dual-stack LotoBot network
-          - keep outbound IPv6 HTTPS for the SES API
-        mutable: change-with-constraints
-    Properties:
-      GroupDescription: Outbound access for Mail Sender in the shared LotoBot VPC
-      VpcId: !Ref VpcId
-      SecurityGroupEgress:
-        - Description: HTTPS over IPv6 to Amazon SES
-          IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIpv6: ::/0
-        - Description: DNS UDP through the VPC resolver
-          IpProtocol: udp
-          FromPort: 53
-          ToPort: 53
-          CidrIp: 0.0.0.0/0
-        - Description: DNS TCP through the VPC resolver
-          IpProtocol: tcp
-          FromPort: 53
-          ToPort: 53
-          CidrIp: 0.0.0.0/0
-
   MailSenderFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -75,23 +39,19 @@ Resources:
         why: accepts IAM-authorized direct invocations and sends one email through SES
         must:
           - do not add a public HTTP event for the LotoBot integration
-          - keep IPv6 enabled because the shared subnet has no IPv4 internet route
+          - keep the function outside the customer VPC because it calls only the SES public API
     Properties:
       CodeUri: src/
       Handler: lambda_handler.handler
-      VpcConfig:
-        SecurityGroupIds:
-          - !Ref MailSenderSecurityGroup
-        SubnetIds:
-          - !Ref SubnetId
-        Ipv6AllowedForDualStack: true
       Policies:
-        - AWSLambdaVPCAccessExecutionRole
         - Statement:
             - Effect: Allow
               Action:
                 - ses:SendEmail
               Resource: "*"
+              Condition:
+                StringEquals:
+                  ses:FromAddress: !Ref SesFrom
 
   MailSenderFunctionLogGroup:
     Type: AWS::Logs::LogGroup
