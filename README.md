@@ -70,7 +70,7 @@ mail-sender-aws/
 │   ├── lambda_handler.py            # Entrada da invocação direta
 │   └── requirements.txt             # Dependências empacotadas pelo SAM
 ├── tests/                            # Testes unitários
-├── docs/                             # Roteiro da migração para AWS
+├── docs/                             # Guias da migração para AWS (Windows e Linux)
 ├── pyproject.toml                    # Projeto e dependências de desenvolvimento
 ├── samconfig.local.toml              # Modelo de configuração do deploy
 └── template.yaml                     # Infraestrutura AWS SAM
@@ -212,6 +212,8 @@ aws sesv2 get-email-identity `
 Enquanto a conta SES estiver no sandbox, tanto o remetente quanto o destinatário precisam estar verificados. Para enviar a destinatários arbitrários, solicite acesso de produção para o SES nessa região.
 
 ## Deploy
+
+Para o procedimento detalhado de migração e deploy, consulte o [guia AWS SAM para Linux](docs/AWS_SAM_MIGRATION_STEP_BY_STEP_LINUX.md) ou o [guia AWS SAM para Windows](docs/AWS_SAM_MIGRATION_STEP_BY_STEP.md).
 
 Crie a configuração local de deploy a partir do modelo versionado:
 
