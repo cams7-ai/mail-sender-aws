@@ -74,6 +74,20 @@ def test_handle_event_returns_500_for_email_send_error():
     }
 
 
+def test_send_error_log_omits_email_content(caplog):
+    content = "Sensitive message body"
+    sender = FakeEmailSender(error=SMTPException("recipient and body may be sensitive"))
+
+    response = handle_event(
+        {"to": "to@example.com", "subject": "Private", "body": content}, sender
+    )
+
+    assert response["statusCode"] == 500
+    assert "SMTPException" in caplog.text
+    assert "to@example.com" not in caplog.text
+    assert content not in caplog.text
+
+
 def test_handle_event_returns_404_for_unknown_endpoint():
     response = handle_event(_event({}, method="GET", path="/api/v1/mail/unknown"), FakeEmailSender())
 
@@ -86,6 +100,11 @@ def test_handle_event_returns_404_for_unknown_endpoint():
     }
 
 
+def test_handle_event_accepts_direct_lambda_invocation():
+    response = handle_event({"to": "to@example.com", "subject": "Assunto", "body": "Mensagem"}, FakeEmailSender())
+    assert response["statusCode"] == 200
+
+
 def _event(body, method="POST", path="/api/v1/mail/send"):
     return {
         "routeKey": f"{method} {path}",
@@ -93,6 +112,7 @@ def _event(body, method="POST", path="/api/v1/mail/send"):
         "requestContext": {"http": {"method": method}},
         "body": json.dumps(body),
         "isBase64Encoded": False,
+        "headers": {"x-api-key": "shared-token"},
     }
 
 
